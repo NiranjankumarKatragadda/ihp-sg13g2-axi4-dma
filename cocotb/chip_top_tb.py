@@ -54,20 +54,18 @@ async def start_up(dut):
 
 @cocotb.test()
 async def test_chip_dma(dut):
-    """Verify axi4_dma pad-level CSR write, DMA copy, and irq assertion."""
+    """Verify axi4_dma pad-level CSR write, DMA copy, and irq on output_PAD[7]."""
     await start_up(dut)
-    dut.bidir_PAD.value = 0
-    for addr, val in [(0x08, 0x00), (0x0C, 0x20), (0x10, 4), (0x00, 1)]:
-        dut.bidir_PAD.value = val
-        dut.input_PAD.value = (1 << 9) | addr
+    for reg, val in [(2, 0), (3, 16), (4, 4), (0, 1)]:
+        dut.input_PAD.value = (1 << 9) | (reg << 5) | val
         await ClockCycles(dut.clk_PAD, 3)
         dut.input_PAD.value = 0
         await ClockCycles(dut.clk_PAD, 2)
     for _ in range(60):
         await ClockCycles(dut.clk_PAD, 1)
-        if (int(dut.bidir_PAD.value) & 1) == 1:
+        if (int(dut.output_PAD.value) >> 7) == 1:
             break
-    assert (int(dut.bidir_PAD.value) & 1) == 1, f"Expected irq=1 on bidir_PAD[0], got {dut.bidir_PAD.value}"
+    assert (int(dut.output_PAD.value) >> 7) == 1, f"Expected irq=1 on output_PAD[7], got {dut.output_PAD.value}"
 
 def chip_top_runner():
 
