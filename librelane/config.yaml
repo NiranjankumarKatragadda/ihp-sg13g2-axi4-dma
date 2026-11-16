@@ -15,7 +15,7 @@ VERILOG_FILES:
 - dir::../src/chip_top.sv
 - dir::../src/chip_core.sv
 - dir::../src/systolic_array_4x4.v
-- dir::../src/pe.v
+- dir::../src/axi4_dma.v
 
 VERILOG_DEFINES: [FUNCTIONAL]
 

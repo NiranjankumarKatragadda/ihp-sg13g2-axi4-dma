@@ -1,6 +1,0 @@
-<testsuites name="results">
-  <testsuite name="all" package="all">
-    <property name="random_seed" value="1794801843" />
-    <testcase name="test_axi4_dma_copy" classname="test_axi_dma" file="/home/niranjankumarkatragadda/ihp-sg13g2-axi4-dma/cocotb/test_axi_dma.py" lineno="6" time="0.03273320198059082" sim_time_ns="490.001" ratio_time="14969.54072169739" />
-  </testsuite>
-</testsuites>
