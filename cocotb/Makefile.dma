@@ -1,0 +1,7 @@
+SIM ?= verilator
+TOPLEVEL_LANG ?= verilog
+VERILOG_SOURCES += $(abspath ../src/axi4_dma.v)
+TOPLEVEL = axi4_dma
+MODULE = test_axi_dma
+EXTRA_ARGS += -Wno-fatal -Wno-WIDTH -Wno-lint -Wno-style
+include $(shell cocotb-config --makefiles)/Makefile.sim

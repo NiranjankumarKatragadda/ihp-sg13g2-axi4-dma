@@ -1,0 +1,116 @@
+[1mdiff --git a/cocotb/chip_top_tb.py b/cocotb/chip_top_tb.py[m
+[1mindex 587506b..6dbd505 100644[m
+[1m--- a/cocotb/chip_top_tb.py[m
+[1m+++ b/cocotb/chip_top_tb.py[m
+[36m@@ -53,32 +53,33 @@[m [masync def start_up(dut):[m
+ [m
+ [m
+ @cocotb.test()[m
+[31m-async def test_counter(dut):[m
+[31m-    """Run the counter test"""[m
+[31m-[m
+[31m-    # Create a logger for this testbench[m
+[31m-    logger = logging.getLogger("my_testbench")[m
+[31m-[m
+[31m-    logger.info("Startup sequence...")[m
+[31m-[m
+[31m-    # Start up[m
+[32m+[m[32masync def test_systolic_array(dut):[m
+[32m+[m[32m    """Verify systolic_array_4x4 LOAD -> COMPUTE -> READ flow."""[m
+[32m+[m[32m    logger = logging.getLogger("systolic_tb")[m
+     await start_up(dut)[m
+[32m+[m[32m    await ClockCycles(dut.clk_PAD, 2)[m
+[32m+[m[32m    assert int(dut.output_PAD.value) == 0, f"Expected 0 after reset, got {dut.output_PAD.value}"[m
+ [m
+[31m-    logger.info("Running the test...")[m
+[31m-[m
+[31m-    # Wait for some time...[m
+[31m-    await ClockCycles(dut.clk_PAD, 10)[m
+[32m+[m[32m    # LOAD weights = 1 (ctrl_in = 2'b01, data_in = 1)[m
+[32m+[m[32m    dut.input_PAD.value = (0b01 << 8) | 1[m
+[32m+[m[32m    await ClockCycles(dut.clk_PAD, 5)[m
+ [m
+[31m-    # Start the counter by setting all inputs to 1[m
+[31m-    dut.input_PAD.value = -1[m
+[32m+[m[32m    # COMPUTE with activation = 2 (ctrl_in = 2'b10, data_in = 2)[m
+[32m+[m[32m    dut.input_PAD.value = (0b10 << 8) | 2[m
+[32m+[m[32m    await ClockCycles(dut.clk_PAD, 14)[m
+ [m
+[31m-    # Wait for a number of clock cycles[m
+[31m-    await ClockCycles(dut.clk_PAD, 100)[m
+[32m+[m[32m    # READ & latch c_col0..c_col3 (ctrl_in = 2'b11)[m
+[32m+[m[32m    dut.input_PAD.value = (0b11 << 8) | 0[m
+[32m+[m[32m    await ClockCycles(dut.clk_PAD, 2)[m
+ [m
+[31m-    # Check the end result of the counter[m
+[31m-    assert dut.output_PAD.value == 100 - 1[m
+[32m+[m[32m    cols = [][m
+[32m+[m[32m    for col in range(4):[m
+[32m+[m[32m        dut.input_PAD.value = (0b11 << 8) | col[m
+[32m+[m[32m        await ClockCycles(dut.clk_PAD, 1)[m
+[32m+[m[32m        cols.append(int(dut.output_PAD.value))[m
+ [m
+[31m-    logger.info("Done!")[m
+[32m+[m[32m    logger.info(f"Systolic READ cols[0..3] = {cols}")[m
+[32m+[m[32m    assert any(v != 0 for v in cols), f"Expected non-zero MAC output, got {cols}"[m
+ [m
+ [m
+ def chip_top_runner():[m
+[1mdiff --git a/cocotb/chip_top_tb.py b/cocotb/chip_top_tb.py[m
+[1mindex 587506b..6dbd505 100644[m
+[1m--- a/cocotb/chip_top_tb.py[m
+[1m+++ b/cocotb/chip_top_tb.py[m
+[36m@@ -53,32 +53,33 @@[m [masync def start_up(dut):[m
+ [m
+ [m
+ @cocotb.test()[m
+[31m-async def test_counter(dut):[m
+[31m-    """Run the counter test"""[m
+[31m-[m
+[31m-    # Create a logger for this testbench[m
+[31m-    logger = logging.getLogger("my_testbench")[m
+[31m-[m
+[31m-    logger.info("Startup sequence...")[m
+[31m-[m
+[31m-    # Start up[m
+[32m+[m[32masync def test_systolic_array(dut):[m
+[32m+[m[32m    """Verify systolic_array_4x4 LOAD -> COMPUTE -> READ flow."""[m
+[32m+[m[32m    logger = logging.getLogger("systolic_tb")[m
+     await start_up(dut)[m
+[32m+[m[32m    await ClockCycles(dut.clk_PAD, 2)[m
+[32m+[m[32m    assert int(dut.output_PAD.value) == 0, f"Expected 0 after reset, got {dut.output_PAD.value}"[m
+ [m
+[31m-    logger.info("Running the test...")[m
+[31m-[m
+[31m-    # Wait for some time...[m
+[31m-    await ClockCycles(dut.clk_PAD, 10)[m
+[32m+[m[32m    # LOAD weights = 1 (ctrl_in = 2'b01, data_in = 1)[m
+[32m+[m[32m    dut.input_PAD.value = (0b01 << 8) | 1[m
+[32m+[m[32m    await ClockCycles(dut.clk_PAD, 5)[m
+ [m
+[31m-    # Start the counter by setting all inputs to 1[m
+[31m-    dut.input_PAD.value = -1[m
+[32m+[m[32m    # COMPUTE with activation = 2 (ctrl_in = 2'b10, data_in = 2)[m
+[32m+[m[32m    dut.input_PAD.value = (0b10 << 8) | 2[m
+[32m+[m[32m    await ClockCycles(dut.clk_PAD, 14)[m
+ [m
+[31m-    # Wait for a number of clock cycles[m
+[31m-    await ClockCycles(dut.clk_PAD, 100)[m
+[32m+[m[32m    # READ & latch c_col0..c_col3 (ctrl_in = 2'b11)[m
+[32m+[m[32m    dut.input_PAD.value = (0b11 << 8) | 0[m
+[32m+[m[32m    await ClockCycles(dut.clk_PAD, 2)[m
+ [m
+[31m-    # Check the end result of the counter[m
+[31m-    assert dut.output_PAD.value == 100 - 1[m
+[32m+[m[32m    cols = [][m
+[32m+[m[32m    for col in range(4):[m
+[32m+[m[32m        dut.input_PAD.value = (0b11 << 8) | col[m
+[32m+[m[32m        await ClockCycles(dut.clk_PAD, 1)[m
+[32m+[m[32m        cols.append(int(dut.output_PAD.value))[m
+ [m
+[31m-    logger.info("Done!")[m
+[32m+[m[32m    logger.info(f"Systolic READ cols[0..3] = {cols}")[m
+[32m+[m[32m    assert any(v != 0 for v in cols), f"Expected non-zero MAC output, got {cols}"[m
+ [m
+ [m
+ def chip_top_runner():[m
