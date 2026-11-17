@@ -24,3 +24,19 @@ async def test_axi4_dma_copy(dut):
     assert int(dut.irq.value) == 1, "DMA did not complete"
     assert ram.read(0x0200, 16) == payload, "DMA data mismatch!"
     dut._log.info("PASS: AXI4 DMA copied 16 bytes cleanly via cocotbext-axi!")
+
+@cocotb.test()
+async def test_axi4_dma_multiburst(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    dut.rst_n.value = 0; await Timer(40, units="ns"); dut.rst_n.value = 1; await RisingEdge(dut.clk)
+    axil = AxiLiteMaster(AxiLiteBus.from_prefix(dut, "s_axil"), dut.clk, dut.rst_n, reset_active_level=False)
+    ram = AxiRam(AxiBus.from_prefix(dut, "m_axi"), dut.clk, dut.rst_n, reset_active_level=False, size=2**16)
+    payload = bytes((i * 7 + 3) & 0xFF for i in range(80))
+    ram.write(0x0400, payload)
+    for addr, val in [(0x08, 0x0400), (0x0C, 0x0800), (0x10, 20), (0x00, 1)]:
+        await axil.write_dword(addr, val)
+    for _ in range(200):
+        await RisingEdge(dut.clk)
+        if int(dut.irq.value) == 1: break
+    assert int(dut.irq.value) == 1 and ram.read(0x0800, 80) == payload
+    dut._log.info("PASS: 20-word (16+4 beat) INCR burst verified!")

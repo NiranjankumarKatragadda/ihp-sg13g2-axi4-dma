@@ -14,8 +14,9 @@ module axi4_dma #(parameter ADDR_W=16, DATA_W=32) (
   output wire [2:0] m_axi_arsize, output wire [1:0] m_axi_arburst, output reg m_axi_arvalid, input wire m_axi_arready,
   input wire [3:0] m_axi_rid, input wire [DATA_W-1:0] m_axi_rdata, input wire [1:0] m_axi_rresp, input wire m_axi_rlast, input wire m_axi_rvalid, output reg m_axi_rready
 );
-  assign s_axil_bresp=0; assign s_axil_rresp=0; assign m_axi_awid=0; assign m_axi_awlen=0; assign m_axi_awsize=3'b010; assign m_axi_awburst=2'b01;
-  assign m_axi_wstrb=4'hF; assign m_axi_wlast=1; assign m_axi_arid=0; assign m_axi_arlen=0; assign m_axi_arsize=3'b010; assign m_axi_arburst=2'b01;
+  reg [DATA_W-1:0] buf_r [0:15]; reg [7:0] burst_len_r; reg [4:0] burst_cnt_r, beat_r;
+  assign s_axil_bresp=0; assign s_axil_rresp=0; assign m_axi_awid=0; assign m_axi_awlen=burst_len_r; assign m_axi_awsize=3'b010; assign m_axi_awburst=2'b01;
+  assign m_axi_wstrb=4'hF; assign m_axi_wlast=(beat_r[3:0]==burst_len_r[3:0]); assign m_axi_arid=0; assign m_axi_arlen=burst_len_r; assign m_axi_arsize=3'b010; assign m_axi_arburst=2'b01;
   reg [ADDR_W-1:0] src_r, dst_r; reg [15:0] len_r, rem_r; reg go, done; reg [2:0] st;
   localparam IDLE=0, RDA=1, RDD=2, WRA=3, WRB=4;
   always @(posedge clk or negedge rst_n) begin
@@ -34,13 +35,13 @@ module axi4_dma #(parameter ADDR_W=16, DATA_W=32) (
     end
   end
   always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin st<=IDLE; done<=0; irq<=0; rem_r<=0; m_axi_arvalid<=0; m_axi_araddr<=0; m_axi_rready<=0; m_axi_awvalid<=0; m_axi_awaddr<=0; m_axi_wvalid<=0; m_axi_wdata<=0; m_axi_bready<=0; end
+    if (!rst_n) begin st<=IDLE; done<=0; irq<=0; rem_r<=0; burst_len_r<=0; burst_cnt_r<=0; beat_r<=0; m_axi_arvalid<=0; m_axi_araddr<=0; m_axi_rready<=0; m_axi_awvalid<=0; m_axi_awaddr<=0; m_axi_wvalid<=0; m_axi_wdata<=0; m_axi_bready<=0; end
     else case (st)
-      IDLE: if (go && len_r!=0) begin done<=0; irq<=0; m_axi_araddr<=src_r; m_axi_awaddr<=dst_r; rem_r<=len_r; st<=RDA; end
-      RDA: begin m_axi_arvalid<=1; if (m_axi_arvalid && m_axi_arready) begin m_axi_arvalid<=0; m_axi_rready<=1; st<=RDD; end end
-      RDD: if (m_axi_rvalid && m_axi_rready) begin m_axi_rready<=0; m_axi_awvalid<=1; m_axi_wvalid<=1; m_axi_wdata<=m_axi_rdata; st<=WRA; end
-      WRA: begin if (m_axi_awvalid && m_axi_awready) m_axi_awvalid<=0; if (m_axi_wvalid && m_axi_wready) m_axi_wvalid<=0; if ((!m_axi_awvalid||m_axi_awready)&&(!m_axi_wvalid||m_axi_wready)) begin m_axi_bready<=1; st<=WRB; end end
-      WRB: if (m_axi_bvalid && m_axi_bready) begin m_axi_bready<=0; if (rem_r==1) begin done<=1; irq<=1; st<=IDLE; end else begin rem_r<=rem_r-1; m_axi_araddr<=m_axi_araddr+4; m_axi_awaddr<=m_axi_awaddr+4; st<=RDA; end end
+      IDLE: if (go && len_r!=0) begin done<=0; irq<=0; m_axi_araddr<=src_r; m_axi_awaddr<=dst_r; rem_r<=len_r; burst_cnt_r<=(len_r>16)?5'd16:len_r[4:0]; burst_len_r<=((len_r>16)?8'd15:(len_r[7:0]-8'd1)); st<=RDA; end
+      RDA: begin m_axi_arvalid<=1; if (m_axi_arvalid && m_axi_arready) begin m_axi_arvalid<=0; beat_r<=0; m_axi_rready<=1; st<=RDD; end end
+      RDD: if (m_axi_rvalid && m_axi_rready) begin buf_r[beat_r[3:0]]<=m_axi_rdata; if (m_axi_rlast || beat_r[3:0]==burst_len_r[3:0]) begin m_axi_rready<=0; beat_r<=0; m_axi_awvalid<=1; m_axi_wvalid<=1; m_axi_wdata<=(burst_len_r==0)?m_axi_rdata:buf_r[0]; st<=WRA; end else beat_r<=beat_r+1; end
+      WRA: begin if (m_axi_awvalid && m_axi_awready) m_axi_awvalid<=0; if (m_axi_wvalid && m_axi_wready) begin if (beat_r[3:0]==burst_len_r[3:0]) m_axi_wvalid<=0; else begin beat_r<=beat_r+1; m_axi_wdata<=buf_r[beat_r[3:0]+4'd1]; end end if ((!m_axi_awvalid||m_axi_awready)&&(!m_axi_wvalid||(m_axi_wvalid&&m_axi_wready&&beat_r[3:0]==burst_len_r[3:0]))) begin m_axi_bready<=1; st<=WRB; end end
+      WRB: if (m_axi_bvalid && m_axi_bready) begin m_axi_bready<=0; if (rem_r=={11'd0,burst_cnt_r}) begin done<=1; irq<=1; st<=IDLE; end else begin rem_r<=rem_r-{11'd0,burst_cnt_r}; m_axi_araddr<=m_axi_araddr+{{(ADDR_W-7){1'b0}},burst_cnt_r,2'b00}; m_axi_awaddr<=m_axi_awaddr+{{(ADDR_W-7){1'b0}},burst_cnt_r,2'b00}; burst_cnt_r<=((rem_r-{11'd0,burst_cnt_r})>16)?5'd16:(rem_r[4:0]-burst_cnt_r); burst_len_r<=(((rem_r-{11'd0,burst_cnt_r})>16)?8'd15:(rem_r[7:0]-{3'd0,burst_cnt_r}-8'd1)); st<=RDA; end end
       default: st<=IDLE;
     endcase
   end
