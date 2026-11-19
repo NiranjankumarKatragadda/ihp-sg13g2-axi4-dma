@@ -16,7 +16,7 @@ Synthesizable 32-bit DMA engine with an AXI4-Lite CSR slave and an AXI4 master i
 | Offset | Name | Description |
 | --- | --- | --- |
 | `0x00` | `CTRL` | `[0]` `go` (write `1` to launch transfer) |
-| `0x04` | `STATUS` | `[0]` `busy` (`st != IDLE`), `[1]` `done` |
+| `0x04` | `STATUS` | `[0]` `done`, `[1]` `busy` (`st != IDLE`) |
 | `0x08` | `SRC` | 32-bit source byte address |
 | `0x0C` | `DST` | 32-bit destination byte address |
 | `0x10` | `WORDS` | `[15:0]` transfer length in 32-bit words |
